@@ -1,0 +1,23 @@
+# uv
+.venv/
+.python-version
+
+# Secrets / local config
+.env
+*.env
+
+# PartDB local data  
+partdb.sqlite
+partdb_sync.json
+
+# KiCad db lib (machine specific paths inside)
+partdb.kicad_dbl
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Logs
+*.log
