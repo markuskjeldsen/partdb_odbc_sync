@@ -291,7 +291,14 @@ class KiCadLibManager:
 
     def upsert_footprint(self, part_name: str, mod_bytes: bytes) -> bool:
         dest = self.fp_dir / f"{part_name}.kicad_mod"
-        dest.write_bytes(mod_bytes)
+        content = mod_bytes.decode("utf-8")
+        # Fix 3D model path to use KiCad path variable
+        import re
+        def fix_model_path(m):
+            fname = Path(m.group(1)).name  # strip any existing path, keep filename
+            return f'(model "${{PARTDB_3DSHAPES}}/{fname}"'
+        content = re.sub(r'\(model\s+"?([^"\s)]+)"?', fix_model_path, content)
+        dest.write_bytes(content.encode("utf-8"))
         log.info("  ✔ Footprint written: %s", dest)
         return True
 
