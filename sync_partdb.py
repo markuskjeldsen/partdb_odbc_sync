@@ -26,7 +26,7 @@ import urllib.error
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_CONFIG = os.path.join(SCRIPT_DIR, "partdb_sync.json")
-DB_PATH = os.path.join(SCRIPT_DIR, "partdb.sqlite")
+DB_PATH = os.path.join(SCRIPT_DIR, "output", "partdb.sqlite")
 DBL_PATH = os.path.join(SCRIPT_DIR, "partdb.kicad_dbl")
 
 # Key column used as the part identifier in KiCad's symbol chooser.

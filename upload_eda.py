@@ -1,50 +1,79 @@
 #!/usr/bin/env python3
 """
-upload_eda.py - Upload a SamacSys zip as 'eda.pdf' attachment to a PartDB part
+upload_eda.py - Upload a SamacSys zip as 'eda' attachment to a PartDB part
 """
 
 import sys
-import zipfile
+import json
 import requests
+import base64
 from pathlib import Path
 
-PARTDB_URL     = "http://localhost:8080"
-PARTDB_API_KEY = "your_api_key_here"
+config = json.loads(Path("partdb_sync.json").read_text())
+PARTDB_URL     = config["server_url"].rstrip("/")
+PARTDB_API_KEY = config["token"]
 
-def find_part_id(session: requests.Session, part_name: str) -> int | None:
-    resp = session.get(f"{PARTDB_URL}/api/parts", params={"name": part_name})
-    resp.raise_for_status()
-    members = resp.json().get("member", [])
-    for m in members:
-        if m["name"] == part_name:
-            return m["id"]
-    return None
 
-def upload_eda_zip(part_name: str, zip_path: Path):
+def get_session() -> requests.Session:
     session = requests.Session()
     session.headers["Authorization"] = f"Bearer {PARTDB_API_KEY}"
+    return session
 
-    if not zipfile.is_zipfile(zip_path):
-        print(f"ERROR: {zip_path} is not a valid zip file")
-        sys.exit(1)
+
+def find_part_id(session: requests.Session, part_name: str) -> int | None:
+    resp = session.get(f"{PARTDB_URL}/api/parts", params={"filter[name]": part_name})
+    resp.raise_for_status()
+    for part in resp.json().get("hydra:member", []):
+        if part["name"] == part_name:
+            return part["id"]
+    return None
+
+
+def find_existing_eda_attachment(session: requests.Session, part_id: int) -> int | None:
+    """Return attachment id if an 'eda' attachment already exists for this part."""
+    resp = session.get(f"{PARTDB_URL}/api/attachments", params={"filter[name]": "eda"})
+    resp.raise_for_status()
+    for att in resp.json().get("hydra:member", []):
+        if att.get("name") == "eda" and att.get("element", {}).get("id") == part_id:
+            return att["id"]
+    return None
+
+
+def upload_eda_zip(part_name: str, zip_path: Path):
+    session = get_session()
 
     part_id = find_part_id(session, part_name)
-    if not part_id:
+    if part_id is None:
         print(f"ERROR: part '{part_name}' not found in PartDB")
         sys.exit(1)
 
     print(f"Uploading {zip_path} → part #{part_id} ({part_name})")
 
-    with open(zip_path, "rb") as fh:
+    file_b64 = base64.b64encode(zip_path.read_bytes()).decode()
+    upload_payload = {
+        "upload": {
+            "data": file_b64,
+            "filename": zip_path.name,
+        }
+    }
+
+    existing_id = find_existing_eda_attachment(session, part_id)
+
+    if existing_id:
+        print(f"  Replacing existing eda attachment #{existing_id}")
+        session.headers["Content-Type"] = "application/merge-patch+json"
+        resp = session.patch(
+            f"{PARTDB_URL}/api/attachments/{existing_id}",
+            json=upload_payload,
+        )
+    else:
         resp = session.post(
-            f"{PARTDB_URL}/api/parts/{part_id}/attachments",
-            data={
-                "name":         "eda",
-                "type":         "other",   # or whatever attachment type ID
-            },
-            files={
-                # Named eda.pdf so PartDB accepts it; content is a zip
-                "file": ("eda.pdf", fh, "application/pdf"),
+            f"{PARTDB_URL}/api/attachments",
+            json={
+                "name":            "eda",
+                "attachment_type": "/api/attachment_types/2",
+                "element":         f"/api/parts/{part_id}",
+                **upload_payload,
             },
         )
 
@@ -52,6 +81,7 @@ def upload_eda_zip(part_name: str, zip_path: Path):
         print(f"✔ Uploaded successfully: {resp.json().get('@id')}")
     else:
         print(f"✘ Upload failed [{resp.status_code}]: {resp.text}")
+
 
 if __name__ == "__main__":
     if len(sys.argv) != 3:
