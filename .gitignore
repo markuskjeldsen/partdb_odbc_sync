@@ -21,3 +21,7 @@ __pycache__/
 
 # Logs
 *.log
+
+# misc.
+output/
+uv.lock
