@@ -349,7 +349,7 @@ def generate_kicad_dbl(table_names, param_columns, exclude_fields, price_qty):
             "username": "",
             "password": "",
             "timeout_seconds": 2,
-            "connection_string": "Driver={SQLite3 ODBC Driver};Database=${CWD}/partdb.sqlite",
+            "connection_string": "Driver={SQLite3};Database=${CWD}/output/partdb.sqlite",
         },
         "globally_unique_keys": True,
         "libraries": libraries,
